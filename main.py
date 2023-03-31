@@ -156,7 +156,7 @@ def append_text_to_file(text, filename):
         f.write(text)
 
         
-def create_video_from_images(image_folder_path, fps):
+def create_video_from_images(image_folder_path, video_folder_path, fps):
     """
     Crée une vidéo à partir d'une série d'images contenues dans un dossier.
 
@@ -167,15 +167,58 @@ def create_video_from_images(image_folder_path, fps):
     Returns:
         str: Le chemin vers le fichier vidéo créé.
     """
-    # Obtenir la liste des noms de fichiers des images triée par ordre alphabétique
-    image_files = sorted([os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path) if f.endswith('.png')])
+    # Obtenir la liste des noms de fichiers des images triée numériquement
+    image_files = sorted([os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path) if f.endswith('.png')], key=lambda x: int(re.search(r'\d+', x).group()))
+
     # Charger les images en utilisant imageio
     images = [imageio.imread(f) for f in image_files]
     # Déterminer le nom du fichier de sortie de la vidéo
-    video_file_name = os.path.join(image_folder_path, 'video.mp4')
+    video_file_name = os.path.join(video_folder_path, 'video.mp4')
     # Créer la vidéo à partir des images chargées
-    imageio.mimsave(video_file_name, images, fps=fps)
+    imageio.mimsave(video_file_name, images, fps=fps, quality=10)
     # Retourner le nom du fichier vidéo créé
+    
+    # Supprimer les fichiers d'images
+    for f in image_files:
+        os.remove(f)
+
+    return video_file_name
+
+
+def create_video_from_images_cv(image_folder_path, video_folder_path, fps):
+    """
+    Crée une vidéo à partir d'une série d'images contenues dans un dossier.
+
+    Args:
+        image_folder_path (str): Le chemin vers le dossier contenant les images.
+        fps (int): Le nombre d'images par seconde dans la vidéo.
+
+    Returns:
+        str: Le chemin vers le fichier vidéo créé.
+    """
+    # Obtenir la liste des noms de fichiers des images triée numériquement
+    image_files = sorted([os.path.join(image_folder_path, f) for f in os.listdir(image_folder_path) if f.endswith('.png')], key=lambda x: int(re.search(r'\d+', x).group()))
+
+    # Charger la première image pour obtenir les dimensions de l'image
+    img = cv2.imread(image_files[0])
+    height, width, layers = img.shape
+
+    # Déterminer le nom du fichier de sortie de la vidéo
+    video_file_name = os.path.join(video_folder_path, 'video.mp4')
+
+    # Initialiser le writer vidéo en utilisant les dimensions de l'image et le nombre d'images par seconde
+    video = cv2.VideoWriter(video_file_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+    # Parcourir les images, les ajouter à la vidéo et les supprimer
+    for image_file in image_files:
+        img = cv2.imread(image_file)
+        video.write(img)
+        os.remove(image_file)
+
+    # Fermer le writer vidéo et retourner le nom du fichier vidéo créé
+    cv2.destroyAllWindows()
+    video.release()
+
     return video_file_name
 
 
@@ -242,52 +285,111 @@ def read_file(filename):
         content = f.read()
     return content
 
+def clear_file_content(file_name):
+    """
+    Supprime le contenu du fichier spécifié.
+
+    Args:
+        file_name (str): Le nom du fichier à vider.
+    """
+    with open(file_name, 'w') as file:
+        file.write('')
+
+
+def compare_images_in_folders(folder1, folder2):
+    """
+    Compare les images ayant le même nom dans deux dossiers différents en utilisant le hash MD5.
+
+    Args:
+        folder1 (str): Le chemin vers le premier dossier.
+        folder2 (str): Le chemin vers le deuxième dossier.
+
+    Returns:
+        Un dictionnaire contenant les noms des images en commun et leur état de correspondance (True/False).
+    """
+
+    # Trouver tous les fichiers d'images dans le premier dossier
+    images1 = [f for f in os.listdir(folder1) if f.endswith('.png')]
+    # Trouver tous les fichiers d'images dans le deuxième dossier
+    images2 = [f for f in os.listdir(folder2) if f.endswith('.png')]
+
+    # Trouver les noms des images en commun entre les deux dossiers
+    common_images = set(images1).intersection(images2)
+
+    # Créer un dictionnaire pour stocker les résultats de la comparaison
+    comparison_results = {}
+
+    # Comparer les images en utilisant le hash MD5
+    for image in common_images:
+        # Lire les images en binaire
+        with open(os.path.join(folder1, image), 'rb') as f1:
+            with open(os.path.join(folder2, image), 'rb') as f2:
+                # Calculer le hash MD5 des images
+                md5_1 = hashlib.md5(f1.read()).hexdigest()
+                md5_2 = hashlib.md5(f2.read()).hexdigest()
+                # Comparer les deux hash et stocker le résultat
+                if md5_1 == md5_2:
+                    comparison_results[image] = True
+                else:
+                    comparison_results[image] = False
+
+    return comparison_results
+
 
 if __name__ == "__main__":
 
+    # print(compare_images_in_folders(r"D:\Binary-Genius\Binary-Genius\Images\first", r"D:\Binary-Genius\Binary-Genius\Images\second"))
     chemin = r"D:\Binary-Genius\Binary-Genius"
+    image_path = r"D:\Binary-Genius\Binary-Genius\Images"
+    video_path = r"D:\Binary-Genius\Binary-Genius\Videos"
     nom_fichier_intial = "ss.zip"
     nom_fichier_generer = "mon_fichier.zip"
 
     fichier_complet_intial = os.path.join(chemin, nom_fichier_intial)
-
-
-    contenu_binaire = file_to_binary(fichier_complet_intial)
-    binary_to_image(contenu_binaire)
-
-    print(f"1eme binnary ==> {len(contenu_binaire)}")
-
-    # Trouver tous les fichiers d'images correspondant au modèle de nom de fichier
-    image_files = glob.glob("Images/frame*.png")
-
-    # Trier les noms de fichiers numériquement
-    image_files = sorted(image_files, key=lambda x: int(re.search(r'\d+', x).group()))
-
-    len_content_file = count_characters(r"D:\Binary-Genius\Binary-Genius\binary_content.text")
-
-    contenu_binaire_2 = ""
-    # Charger les images et générer le contenu binaire
-    for file in image_files:
-        with Image.open(file) as image:
-            image_name = os.path.basename(file)
-            print(image_name)
-            image_to_binary(image, len(contenu_binaire), image_name)
-
-    #ss = count_characters(r"D:\Binary-Genius\Binary-Genius\binary_content.text")
-    contenu_binaire_2 = read_file(r"D:\Binary-Genius\Binary-Genius\binary_content.text")
-    print(f"2eme binnary ==> {len(contenu_binaire_2)}")
-
     fichier_complet_generer = os.path.join(chemin, nom_fichier_generer)
 
-    binary_to_file(contenu_binaire_2, nom_fichier_generer)
-    compare_file_hashes(fichier_complet_intial , fichier_complet_generer)
-    #temp = find_difference(contenu_binaire_2, contenu_binaire)
-    #print(len(temp))
-    # create_video_from_images(r"D:\Binary-Genius\Binary-Genius\Images", 30)
+
+    # contenu_binaire = file_to_binary(fichier_complet_intial)
+    # binary_to_image(contenu_binaire)
+
+    # create_video_from_images(image_path, video_path, 10)
+    # create_video_from_images_cv(image_path, video_path, 10)
+
+    # print(f"1eme binnary ==> {len(contenu_binaire)}")
+
+    #video_path = r"D:\Binary-Genius\Binary-Genius\Videos\video.mp4"
+    video_path = r"D:\Binary-Genius\Binary-Genius\Videos\Video Test.mp4"
+
+    num_frames = extract_frames_from_video(video_path, image_path)
+    print(f"{num_frames} images extraites") 
+
+    # # Trouver tous les fichiers d'images correspondant au modèle de nom de fichier
+    # image_files = glob.glob("Images/frame*.png")
+
+    # # Trier les noms de fichiers numériquement
+    # image_files = sorted(image_files, key=lambda x: int(re.search(r'\d+', x).group()))
+
+    # len_content_file = count_characters(FILE_NAME)
+
+    # contenu_binaire_2 = ""
+    # # Charger les images et générer le contenu binaire
+    # for file in image_files:
+    #     with Image.open(file) as image:
+    #         image_name = os.path.basename(file)
+    #         image_to_binary(image, len(contenu_binaire), image_name)
+
+    # # #ss = count_characters(r"D:\Binary-Genius\Binary-Genius\binary_content.text")
+    # contenu_binaire_2 = read_file(r"D:\Binary-Genius\Binary-Genius\binary_content.text")
+    
+    # print(f"2eme binnary ==> {len(contenu_binaire_2)}")
+
+    
+
+    # binary_to_file(contenu_binaire_2, nom_fichier_generer)
+    # compare_file_hashes(fichier_complet_intial , fichier_complet_generer)
+    # temp = find_difference(contenu_binaire_2, contenu_binaire)
+    # print(len(temp))
 
 
-    # video_path = r"D:\Binary-Genius\Binary-Genius\Images\video.mp4"
-    # output_dir = r"D:\Binary-Genius\Binary-Genius\Images"
-    # num_frames = extract_frames_from_video(video_path, output_dir)
-    # print(f"{num_frames} images extraites") 
+    clear_file_content(FILE_NAME)
     
